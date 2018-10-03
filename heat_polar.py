@@ -33,7 +33,7 @@ from matplotlib.pylab import subplot2grid
 # problem variables
 R = 1                           # radius of the particle
 l = 0.2                         # heat diffusion coefficient
-max_time   = 50                 # number of frames to simulate
+max_time      = 50              # number of frames to simulate
 Thot, Tborder = 1., 0.          # temperatures at the hotspot
                                 # .. and on the borders of the particle
                                 # .. (for Dirichlet boundary condition)
@@ -77,10 +77,7 @@ def border_func(x):
 # zero everywhere else)
 def init():
     u = np.zeros((max_time, 1 + (P-1)*Q))
-        
-    # renormalize
-    if renormalize: u /= np.linalg.norm(u)
-
+    
     # set max temp point in the middle
     u[0,0] = Thot
     # set border points
