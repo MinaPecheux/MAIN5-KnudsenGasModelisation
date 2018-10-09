@@ -77,11 +77,12 @@ def border_func(x):
 def init():
     u = np.zeros((max_time, 1 + (P-1)*Q))
 
-    # set max temp point in the middle
-    u[0,0] = Thot
-    # set border points
-    for q in range(1, Q+1):
-        u[0, idx(P-1, q)] = border_func(u[0, idx(P-2, q)])
+    # init point with Gaussian values
+    c = 1.
+    u[0,0] = c
+    for p in range(1, P):
+        for q in range(1, Q+1):
+            u[0,idx(p, q)] = c * np.exp(-p**2)
 
     return u
 
