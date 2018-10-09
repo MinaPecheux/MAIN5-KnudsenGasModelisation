@@ -32,26 +32,25 @@ from matplotlib.pylab import subplot2grid
 # ---------
 # problem variables
 R = 1                           # radius of the particle
-l = 0.2                         # heat diffusion coefficient
+l = 1                           # heat diffusion coefficient
 max_time      = 50              # number of frames to simulate
 Thot, Tborder = 1., 0.          # temperatures at the hotspot
                                 # .. and on the borders of the particle
                                 # .. (for Dirichlet boundary condition)
-border_condition = 'Dirichlet'  # type of boundary condition:
+TP = 0.1
+border_condition = 'Neumann'    # type of boundary condition:
                                 # .. 'Dirichlet' or 'Neumann'
-renormalize = True              # apply renormalization at each iteration?
 
 # discretization variables
 P       = 10 # radius: nb of discretization points
 Q       = 30 # angle: nb of discretization points
 dr      = R / P
 dtheta  = 2*np.pi / Q
-Nt      = 120
-dt      = max_time * 1./Nt
+dt      = 0.5 / (l/(dr**2) + l/(dtheta**2)) # to verify the CFL condition
 
 # visualization variables
 EXPORT    = False
-ANIM_RATE = 500
+ANIM_RATE = 200
 tx, ty    = 7.*R/10., 8.*R/10.
 
 # FUNCTIONS
@@ -61,13 +60,13 @@ idx     = lambda p, q: 1 + (p-1)*Q + ((q-1) % Q) if p > 0 else 0 # (skip first p
 
 # function to compute the interactions with the environment
 def g():
-    return 0.
+    return 1.
 
 # function to compute the value of the particle's border points
 # (Dirichlet or Neumann boundary conditions)
 def border_func(x):
     if border_condition == 'Dirichlet': return Tborder
-    elif border_condition == 'Neumann': return g()
+    elif border_condition == 'Neumann': return TP - g()*dr
     else:
         print('[Error] Unknown border condition.')
         sys.exit(1)
@@ -77,22 +76,22 @@ def border_func(x):
 # zero everywhere else)
 def init():
     u = np.zeros((max_time, 1 + (P-1)*Q))
-    
+
     # set max temp point in the middle
     u[0,0] = Thot
     # set border points
-    for q in range(Q):
+    for q in range(1, Q+1):
         u[0, idx(P-1, q)] = border_func(u[0, idx(P-2, q)])
-    
+
     return u
 
 # function to update the approximation array
 def update(u):
     next_u = np.zeros_like(u)
-    
+
     # middle points
     for p in range(1, P - 1):
-        for q in range(Q):
+        for q in range(1, Q+1):
             A = (u[idx(p+1,q)] - 2*u[idx(p,q)] + u[idx(p-1,q)]) / (dr**2) \
                 + (u[idx(p+1,q)] - u[idx(p-1,q)]) / (2*dr**2*p) \
                 + (u[idx(p,q+1)] - 2*u[idx(p,q)] + u[idx(p,q-1)]) / ((p*dr)**2 * dtheta**2)
@@ -100,14 +99,11 @@ def update(u):
     # special treatment: middle point
     # take mean of first circle
     next_u[0] = np.mean(next_u[idx(1,1):idx(1,Q)])
-    
-    # renormalize
-    if renormalize: next_u /= np.linalg.norm(next_u)
 
     # border points
-    for q in range(Q):
+    for q in range(1, Q+1):
         next_u[idx(P-1, q)] = border_func(next_u[idx(P-2, q)])
-    
+
     return next_u
 
 # function to compute and output the simulation
@@ -115,30 +111,30 @@ def simulate(t, u, text, p01, p02):
     # compute new simulation iteration
     if t > 0:
         u[t] = update(u[t-1])
-    
+
     # plot new image
     data = np.zeros((len(u[t]), 3))
     data[0, -1] = u[t, 0]
     xx, yy = [0], [u[t, 0]]
     i = 0
     for p in range(1, P):
-        for q in range(Q):
+        for q in range(1, Q+1):
             data[idx(p, q),0] = (p * dr) * np.cos(q * dtheta)
             data[idx(p, q),1] = (p * dr) * np.sin(q * dtheta)
             data[idx(p, q),2] = u[t, idx(p, q)]
             i += 1
         xx.append(p)
         yy.append(u[t, idx(p, 0)])
-    
+
     # update figures
     p01.set_offsets(data[:,:2])
     p01.set_array(data[:,2])
     p01.set_clim(np.min(data[:,2]), np.max(data[:,2]))
     p02.set_data((xx, yy))
     text.set_text('Iter. %d' % (t+1))
-    
+
     return u, text, p01, p02,
-    
+
 # MAIN ROUTINE
 # ------------
 # init grid
