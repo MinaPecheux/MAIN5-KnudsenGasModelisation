@@ -37,7 +37,7 @@ max_time      = 50              # number of frames to simulate
 Thot, Tborder = 1., 0.          # temperatures at the hotspot
                                 # .. and on the borders of the particle
                                 # .. (for Dirichlet boundary condition)
-TP = 0.1
+TP = 0.1                        # external temperature (for phantom points)
 border_condition = 'Neumann'    # type of boundary condition:
                                 # .. 'Dirichlet' or 'Neumann'
 
@@ -66,7 +66,10 @@ def g():
 # (Dirichlet or Neumann boundary conditions)
 def border_func(x):
     if border_condition == 'Dirichlet': return Tborder
-    elif border_condition == 'Neumann': return TP - g()*dr
+    elif border_condition == 'Neumann':
+        return TP - g()*dr        # with arbitrary phantom point
+        # return g()*dr - x       # with interior point
+        # return (TP - x)/(2*dr)  # centered?
     else:
         print('[Error] Unknown border condition.')
         sys.exit(1)
