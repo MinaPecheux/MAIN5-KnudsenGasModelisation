@@ -79,13 +79,12 @@ def border_func(x):
 # zero everywhere else)
 def init():
     u = np.zeros((max_time, 1 + (P-1)*Q))
-
     # init point with Gaussian values
     c = 1.
     u[0,0] = c
     for p in range(1, P):
         for q in range(1, Q+1):
-            u[0,idx(p, q)] = c * np.exp(-p**2)
+            u[0,idx(p, q)] = c * np.exp(-(p*dr*np.cos(q*dtheta))**2)
 
     return u
 
@@ -110,16 +109,33 @@ def update(u):
 
     return next_u
 
+# function to update the exact solution u
+def update_exact(u, t):
+    next_u_exact = np.zeros_like(u)
+
+    # middle points
+    for p in range(0, P):
+        # approximation of the exact solution with a quadrature method
+        next_u_exact[p] = 1
+        for yi in np.arange(-1000,1000, 0.1):
+            next_u_exact[p] += np.exp( - (p - yi)**2 / (4*t*dt) - yi**2 ) * 0.1
+        next_u_exact[p] *= 1 / np.sqrt(4*np.pi*t*dt)
+        
+    return next_u_exact
+
+
 # function to compute and output the simulation
-def simulate(t, u, text, p01, p02):
+def simulate(t, u, text, p01, p02, p03):
     # compute new simulation iteration
     if t > 0:
         u[t] = update(u[t-1])
+        u_exact[t] = update_exact(u_exact[t-1], t)
 
     # plot new image
     data = np.zeros((len(u[t]), 3))
     data[0, -1] = u[t, 0]
     xx, yy = [0], [u[t, 0]]
+    xx_exact, yy_exact = [0], [u_exact[t, 0]]
     i = 0
     for p in range(1, P):
         for q in range(1, Q+1):
@@ -129,20 +145,25 @@ def simulate(t, u, text, p01, p02):
             i += 1
         xx.append(p)
         yy.append(u[t, idx(p, 0)])
+        
+        xx_exact.append(p)
+        yy_exact.append(u_exact[t, p])
 
     # update figures
     p01.set_offsets(data[:,:2])
     p01.set_array(data[:,2])
     p01.set_clim(np.min(data[:,2]), np.max(data[:,2]))
     p02.set_data((xx, yy))
+    p03.set_data((xx_exact, yy_exact))
     text.set_text('Iter. %d' % (t+1))
 
-    return u, text, p01, p02,
+    return u, text, p01, p02, p03,
 
 # MAIN ROUTINE
 # ------------
 # init grid
 u = init()
+u_exact = init()
 
 # prepare figure
 fig = plt.figure(figsize=(14, 6))
@@ -156,11 +177,12 @@ ax02.set_ylim((-np.max(u), np.max(u)))
 # set plots
 p011 = ax01.text(tx, ty, 'Iter. 0', bbox=dict(facecolor='white'), label='p011')
 p012 = ax01.scatter([], [], c=[], cmap='coolwarm', label='p012', vmin=0., vmax=Thot)
-p02, = ax02.plot([], [], label='p02')
+p021, = ax02.plot([], [], label='p021')
+p022, = ax02.plot([], [], label='p022')
 
 # create final animation
 im_ani = animation.FuncAnimation(
-    fig, simulate, fargs=(u, p011, p012, p02), frames=max_time,
+    fig, simulate, fargs=(u, p011, p012, p021,p022), frames=max_time,
     interval=ANIM_RATE, blit=False
 )
 # output anim (to file, or directly)
