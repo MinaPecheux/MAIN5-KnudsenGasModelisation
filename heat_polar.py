@@ -7,7 +7,6 @@
 # -------------------------------------------
 import sys
 import numpy as np
-import scipy.integrate as integrate
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.pylab import subplot2grid
@@ -42,6 +41,8 @@ TP = 0.1                        # external temperature (for phantom points)
 border_condition = 'Neumann'    # type of boundary condition:
                                 # .. 'Dirichlet' or 'Neumann'
 k = 1.
+m = 0.
+sigma = 0.1
 
 # discretization variables
 P       = 10 # radius: nb of discretization points
@@ -52,7 +53,7 @@ dt      = 0.5 / (l/(dr**2) + l/(dtheta**2)) # to verify the CFL condition
 
 # visualization variables
 EXPORT    = False
-ANIM_RATE = 400
+ANIM_RATE = 600
 tx, ty    = 7.*R/10., 8.*R/10.
 
 # FUNCTIONS
@@ -81,12 +82,11 @@ def border_func(x):
 def init():
     u = np.zeros((max_time, 1 + (P-1)*Q))
     # init point with Gaussian values
-    c = 1.
+    c = 1./(np.sqrt(2*np.pi)*sigma)
     u[0,0] = c
     for p in range(1, P):
         for q in range(1, Q+1):
-            # u[0,idx(p, q)] = c * np.exp(-(p*dr*np.cos(q*dtheta))**2)
-            u[0,idx(p, q)] = c * np.exp(-k*(p*dr)**2)
+            u[0,idx(p, q)] = c * np.exp(-((p*dr)-m)**2/(2*sigma**2))
 
     return u
 
@@ -103,14 +103,9 @@ def update(u, t):
             next_u[idx(p, q)] = u[idx(p, q)] + l * dt * A
     # special treatment: center point
     # take mean of first circle
-    # next_u[0] = u[0]
+    next_u[0] = u[0]
     # next_u[0] = np.mean(next_u[idx(1,1):idx(1,Q)])
     #next_u[0] = 2.*(u[idx(1,1)] - 2*u[0] + u[idx(1,Q//2)])/(dr**2)
-    integrand = lambda x, t, p: np.exp(-(p - x)**2 / (4*t*dt) - k*x**2)
-    next_u[0] = integrate.quad(
-        integrand, -np.inf, np.inf, args=(t, 0)
-    )[0]
-    next_u[0] *= 1 / np.sqrt(4*np.pi*t*dt)
 
     # border points
     for q in range(1, Q+1):
@@ -122,12 +117,9 @@ def update(u, t):
 def update_exact(u, t):
     next_u_exact = np.zeros_like(u)
 
-    integrand = lambda x, t, p: np.exp(-(p - x)**2 / (4*t*dt) - k*x**2)
     for p in range(0, P):
-        next_u_exact[idx(p, 0)] = integrate.quad(
-            integrand, -np.inf, np.inf, args=(t, p)
-        )[0]
-        next_u_exact[idx(p, 0)] *= 1 / np.sqrt(4*np.pi*t*dt)
+        next_u_exact[idx(p, 0)] = np.exp(-(p*dr-m)**2 / (2*(sigma**2 + 2*k*t*dt)))
+        next_u_exact[idx(p, 0)] *= 1. / np.sqrt(2*np.pi*(sigma**2 + 2*k*t*dt))
 
     # # middle points
     # for p in range(0, P):
