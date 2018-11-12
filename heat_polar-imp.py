@@ -35,18 +35,18 @@ from matplotlib.pylab import subplot2grid
 # problem variables
 R = 1                           # radius of the particle
 k = 1                           # heat diffusion coefficient
-max_time      = 10              # number of frames to simulate
+max_time      = 30              # number of frames to simulate
 Thot, Tborder = 1., 0.          # temperatures at the hotspot
                                 # .. and on the borders of the particle
                                 # .. (for Dirichlet boundary condition)
 TP = 0.1                        # external temperature (for phantom points)
-border_condition = 'Neumann'    # type of boundary condition:
+border_condition = 'Dirichlet'    # type of boundary condition:
                                 # .. 'Dirichlet' or 'Neumann'
 m = 0.
 sigma = 0.1
 
 # discretization variables
-P       = 10 # radius: nb of discretization points
+P       = 20 # radius: nb of discretization points
 Q       = 30 # angle: nb of discretization points
 dr      = R / P
 dtheta  = 2*np.pi / Q
@@ -54,7 +54,7 @@ dt      = 0.5 / (k/(dr**2) + k/(dtheta**2)) # to verify the CFL condition
 
 # visualization variables
 EXPORT    = False
-ANIM_RATE = 600
+ANIM_RATE = 300
 tx, ty    = 7.*R/10., 8.*R/10.
 
 # FUNCTIONS
@@ -80,43 +80,43 @@ def border_func(x):
         
 def M():
     t    = k*dt
-    Ai   = lambda i: 1 + 2*t/(dr**2) - 2*t/((i*dr)**2 * (dtheta**2))
+    Ai   = lambda i: 1 + 2*t/(dr**2) + 2*t/((i*dr)**2 * (dtheta**2))
     Bi   = lambda i: -t/((i*dr)**2 * (dtheta**2))
     Ci_p = lambda i: -t/(dr**2) * (1 + 1/(2*i))
     Ci_m = lambda i: -t/(dr**2) * (1 - 1/(2*i))
     
     M = np.zeros((1 + (P-1)*Q, 1 + (P-1)*Q)) # square matrix
     # central point: centered scheme
-    M[0,0]      = -1./(dr**2)
-    M[0,1]      = 1./(dr**2)
-    M[0,Q//2+1] = 1./(dr**2)
+    M[0,0]      = 1. + 4*t/(dr**2)
+    M[0,1]      = -2*t/(dr**2)
+    M[0,Q//2+1] = -2*t/(dr**2)
     # specific treatment for first ring (p = 1)
     for q in range(1, Q+1):
-        M[q,0]   = Ci_p(1)
+        M[q,0]   = Ci_m(1)
         M[q,q]   = Ai(1)
         if q == 1: M[q,Q]   = Bi(1)   # modulo on q indices
         else:      M[q,q-1] = Bi(1)
         if q == Q: M[q,1]   = Bi(1)
         else:      M[q,q+1] = Bi(1)
-        M[q,q+Q] = Ci_m(1)
+        M[q,q+Q] = Ci_p(1)
     # middle points
     for p in range(2, P-1):
         for tmp_q in range(1, Q+1):
             q = tmp_q + (p-1)*Q           # get real row index
-            M[q,q-Q] = Ci_p(p)
+            M[q,q-Q] = Ci_m(p)
             M[q,q]   = Ai(p)
-            if tmp_q == 1: M[q,Q]   = Bi(p)   # modulo on q indices
-            else:          M[q,q-1] = Bi(p)
+            if tmp_q == 1: M[q,q+Q-1] = Bi(p)   # modulo on q indices
+            else:          M[q,q-1]   = Bi(p)
             if tmp_q == Q: M[q,1+(p-1)*Q] = Bi(p)
             else:          M[q,q+1]       = Bi(p)
-            M[q,q+Q] = Ci_m(p)
+            M[q,q+Q] = Ci_p(p)
     # specific treatment for last ring (p = P-1)
     for tmp_q in range(1, Q+1):
         q = tmp_q + (P-2)*Q           # get real row index
-        M[q,q-Q] = Ci_p(P-1)
+        M[q,q-Q] = Ci_m(P-1)
         M[q,q]   = Ai(P-1)
-        if tmp_q == 1: M[q,Q]   = Bi(P-1)   # modulo on q indices
-        else:          M[q,q-1] = Bi(P-1)
+        if tmp_q == 1: M[q,q+Q-1] = Bi(P-1)   # modulo on q indices
+        else:          M[q,q-1]   = Bi(P-1)
         if tmp_q == Q: M[q,1+(P-2)*Q] = Bi(P-1)
         else:          M[q,q+1]       = Bi(P-1)
                 
@@ -147,7 +147,7 @@ def update(u, M, t):
     # next_u[0] = u[0] # no change
     # next_u[0] = np.mean(next_u[idx(1,1):idx(1,Q)]) # take mean of first circle
     # next_u[0] = (u[idx(1,1)] - u[0] + u[idx(1,Q//2+1)])/(dr**2)
-    next_u[0] = 1. / np.sqrt(2*np.pi*(sigma**2 + 2*k*t*dt)) # exact solution
+    # next_u[0] = 1. / np.sqrt(2*np.pi*(sigma**2 + 2*k*t*dt)) # exact solution
 
     # border points
     for q in range(1, Q+1):
