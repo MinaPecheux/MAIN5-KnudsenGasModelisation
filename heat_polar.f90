@@ -67,71 +67,77 @@ contains
     
     real function Ci_m(i)
         integer, intent(in) :: i
-        Ci_p = -k*dt/(dr**2) * (1.0 - 1.0/(2*i))
+        Ci_m = -k*dt/(dr**2) * (1.0 - 1.0/(2*i))
     end function Ci_m
     
     subroutine initialize_matrix()
-        integer :: p, q, tmp_q
+        integer :: lp, lq, tmp_q
         
         ! allocate matrix + initialize to zero
         allocate(M(N, N))
-        do p = 1, N
-            do q = 1, N
-                M(p,q) = 0.0
+        do lp = 1, N
+            do lq = 1, N
+                M(lp,lq) = 0.0
             end do
         end do
         
         ! central point
-        M(1,1)      = 1.0 + 4*k*dt/(dr**2)
-        M(1,2)      = -2*k*dt/(dr**2)
-        M(1,Q//2+2) = -2*k*dt/(dr**2)
+        M(1,1)     = 1.0 + 4*k*dt/(dr**2)
+        M(1,2)     = -2*k*dt/(dr**2)
+        M(1,Q/2+2) = -2*k*dt/(dr**2)
         
         ! specific treatment for first ring (p = 1)
-        do q = 1, Q
-            M(q+1,1)   = Ci_m(1)
-            M(q+1,q+1) = Ai(1)
-            if (q == 1) then
-                M(q+1, Q+1) = Bi(1)
+        do lq = 1, Q
+            M(lq+1,1)    = Ci_m(1)
+            M(lq+1,lq+1) = Ai(1)
+            if (lq == 1) then
+                M(lq+1, Q+1)  = Bi(1)
             else
-                M(q+1, q)   = Bi(1)
-            if (q == Q) then
-                M(q+1, 1)   = Bi(1)
+                M(lq+1, lq)   = Bi(1)
+            end if
+            if (lq == Q) then
+                M(lq+1, 1)    = Bi(1)
             else
-                M(q+1, q+2) = Bi(1)
-            M(q+1, q+Q+1) = Ci_p(1)
+                M(lq+1, lq+2) = Bi(1)
+            end if
+            M(lq+1, lq+Q+1) = Ci_p(1)
         end do
         
         ! middle points
         do p = 2, P-2
             do tmp_q = 1, Q
-                q            = tmp_q + (p-1) * Q
-                M(q+1,q+1-Q) = Ci_m(p)
-                M(q+1,q+1)   = Ai(p)
+                lq           = tmp_q + (p-1) * Q
+                M(lq+1,lq+1-Q) = Ci_m(p)
+                M(lq+1,lq+1)   = Ai(p)
                 if (tmp_q == 1) then
-                    M(q+1, q+Q)       = Bi(p)
+                    M(lq+1, lq+Q)      = Bi(p)
                 else
-                    M(q+1, q)         = Bi(p)
+                    M(lq+1, lq)        = Bi(p)
+                end if
                 if (tmp_q == Q) then
-                    M(q+1, 2+(p-1)*Q) = Bi(p)
+                    M(lq+1, 2+(p-1)*Q) = Bi(p)
                 else
-                    M(q+1, q+2)       = Bi(p)
+                    M(lq+1, lq+2)      = Bi(p)
+                end if
             end do
-            M(q+1, q+Q+1) = Ci_p(p)
+            M(lq+1, lq+Q+1) = Ci_p(p)
         end do
             
         ! specific treatment for last ring (p = P-1)
         do tmp_q = 1, Q
-            q            = tmp_q + (P-2) * Q
-            M(q+1,q+1-Q) = Ci_m(P-1)
-            M(q+1,q+1)   = Ai(P-1)
+            lq             = tmp_q + (P-2) * Q
+            M(lq+1,lq+1-Q) = Ci_m(P-1)
+            M(lq+1,lq+1)   = Ai(P-1)
             if (tmp_q == 1) then
-                M(q+1, q+Q)       = Bi(P-1)
+                M(lq+1, lq+Q)      = Bi(P-1)
             else
-                M(q+1, q)         = Bi(P-1)
+                M(lq+1, lq)        = Bi(P-1)
+            end if
             if (tmp_q == Q) then
-                M(q+1, 2+(P-2)*Q) = Bi(P-1)
+                M(lq+1, 2+(P-2)*Q) = Bi(P-1)
             else
-                M(q+1, q+2)       = Bi(P-1)
+                M(lq+1, lq+2)      = Bi(P-1)
+            end if
         end do
         
     end subroutine initialize_matrix
@@ -179,13 +185,16 @@ contains
 
     subroutine update()
         implicit none
+        external dgesv
+        integer                         :: info
+        integer, dimension(N)           :: ipiv
         real, dimension(:), allocatable :: next_u
         
         ! temporary holder
         allocate(next_u(N))
         
         ! solve linear system M*next_u = u
-        call normal_solve(N, N, M, u, next_u)
+        call dgesv(N, 1, M, N, ipiv, u, N, info)
         ! update values
         u = next_u
         
@@ -201,12 +210,12 @@ end module heat_approximation
 
 program simulate
     ! import linear algebra packages
-    use la_precision, only: wp => sp
-    use f95_lapack
+    !use la_precision, only: wp => sp
+    !use f95_lapack
     ! import heat_approximation module
     use heat_approximation
     
-    integer :: lt, T = 10
+    integer :: T = 10, lt
     real    :: d
     
     ! initialize variables
