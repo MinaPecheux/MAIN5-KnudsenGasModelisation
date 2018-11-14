@@ -1,3 +1,7 @@
+!--------------------------------------------------------------------
+! HEAT APPROXIMATION MODULE
+!--------------------------------------------------------------------
+
 module heat_approximation
 
 ! avoid automatic variables declarations
@@ -16,10 +20,10 @@ contains
     !--------------------------------------------------------------------
     ! UTIL FUNCTIONS
     !--------------------------------------------------------------------
-    integer function idx(p, q)
-        integer, intent(in) :: p, q
-        if (p > 0) then
-            idx = 2 + (p-1)*Q + mod(q-1, Q) ! Fortran is 1-indexed...
+    integer function idx(lp, lq)
+        integer, intent(in) :: lp, lq
+        if (lp > 0) then
+            idx = 2 + (lp-1)*Q + mod(lq-1, Q) ! Fortran is 1-indexed...
         else
             idx = 1
         end if
@@ -32,8 +36,8 @@ contains
 
     subroutine initialize_arrays()
         implicit none
-        integer :: p, q
-        real    :: c
+        integer :: lp, lq
+        real    :: c, tmp
         
         ! allocate arrays
         allocate(u(N))
@@ -42,10 +46,11 @@ contains
         c          = 1.0 / (sqrt(2*PI) * sigma)
         u(1)       = c
         u_exact(1) = c
-        do p = 1, P
-            do q = 1, Q
-                u(idx(p, q))       = c * exp(-(p*dr - mu) ** 2 / (2*sigma ** 2))
-                u_exact(idx(p, q)) = c * exp(-(p*dr - mu) ** 2 / (2*sigma ** 2))
+        do lp = 1, P-1
+            do lq = 1, Q
+                tmp                  = c * exp(-(lp*dr - mu) ** 2 / (2*sigma ** 2))
+                u(idx(lp, lq))       = tmp
+                u_exact(idx(lp, lq)) = tmp
             end do
         end do
     end subroutine initialize_arrays
@@ -62,16 +67,19 @@ contains
     
     real function Ci_p(i)
         integer, intent(in) :: i
-        Ci_p = -k*dt/(dr**2) * (1.0 + 1.0/(2*i))
+        Ci_p = -k*dt/(dr**2) * (1.0 + 1/(2*i))
     end function Ci_p
     
     real function Ci_m(i)
         integer, intent(in) :: i
-        Ci_m = -k*dt/(dr**2) * (1.0 - 1.0/(2*i))
+        Ci_m = -k*dt/(dr**2) * (1.0 - 1/(2*i))
     end function Ci_m
     
     subroutine initialize_matrix()
         integer :: lp, lq, tmp_q
+        
+        print *, "....",Ci_p(1)
+        print *, Ci_m(1)
         
         ! allocate matrix + initialize to zero
         allocate(M(N, N))
@@ -82,9 +90,9 @@ contains
         end do
         
         ! central point
-        M(1,1)     = 1.0 + 4*k*dt/(dr**2)
-        M(1,2)     = -2*k*dt/(dr**2)
-        M(1,Q/2+2) = -2*k*dt/(dr**2)
+        M(1,1)     = 1.0 + 4.0*k*dt/(dr**2)
+        M(1,2)     = -2.0*k*dt/(dr**2)
+        M(1,Q/2+2) = -2.0*k*dt/(dr**2)
         
         ! specific treatment for first ring (p = 1)
         do lq = 1, Q
@@ -104,23 +112,23 @@ contains
         end do
         
         ! middle points
-        do p = 2, P-2
+        do lp = 2, P-2
             do tmp_q = 1, Q
-                lq           = tmp_q + (p-1) * Q
-                M(lq+1,lq+1-Q) = Ci_m(p)
-                M(lq+1,lq+1)   = Ai(p)
+                lq           = tmp_q + (lp-1) * Q
+                M(lq+1,lq+1-Q) = Ci_m(lp)
+                M(lq+1,lq+1)   = Ai(lp)
                 if (tmp_q == 1) then
-                    M(lq+1, lq+Q)      = Bi(p)
+                    M(lq+1, lq+Q)       = Bi(lp)
                 else
-                    M(lq+1, lq)        = Bi(p)
+                    M(lq+1, lq)         = Bi(lp)
                 end if
                 if (tmp_q == Q) then
-                    M(lq+1, 2+(p-1)*Q) = Bi(p)
+                    M(lq+1, 2+(lp-1)*Q) = Bi(lp)
                 else
-                    M(lq+1, lq+2)      = Bi(p)
+                    M(lq+1, lq+2)       = Bi(lp)
                 end if
             end do
-            M(lq+1, lq+Q+1) = Ci_p(p)
+            M(lq+1, lq+Q+1) = Ci_p(lp)
         end do
             
         ! specific treatment for last ring (p = P-1)
@@ -146,17 +154,25 @@ contains
         implicit none
         integer, intent(in) :: lP, lQ
         real,    intent(in) :: lR, lk, ldt
+        integer :: i, j
 
         ! initialize variables
-        P = lP; Q = lQ; R = lR
+        P = lP; Q = lQ; R = lR; k = lk
         dr = R / P; dtheta = 2*PI / Q
-        dt = ldt
+        !dt = ldt
+        dt = 0.5 / (k/(dr**2) + k/(dtheta**2))
         N = 1 + (P-1) * Q
         
         ! initialize arrays
-        call initialize_arrays()
+        call initialize_arrays()        
         ! initialize scheme matrix M
         call initialize_matrix()
+        
+        do i = 1,N
+            do j = 1,N
+                print *, "M[", i, ",", j, "] =", M(i,j)
+            end do
+        end do
     end subroutine initialize_variables
     
     subroutine free_memory()
@@ -171,35 +187,27 @@ contains
     subroutine update_exact(t)
         implicit none
         integer, intent(in) :: t
-        integer             :: p, q
+        integer             :: lp, lq
         real                :: c
         
         ! update values
         c = 1.0 / (sqrt(2*PI * (sigma ** 2 + 2*k*t*dt)))
-        do p = 0, P-1
-            do q = 1, Q
-                u(idx(p, q)) = c * exp(-(p*dr - mu) ** 2 / (2*(sigma ** 2 + 2*k*t*dt)))
+        u_exact(1) = c
+        do lp = 1, P-1
+            do lq = 1, Q
+                u_exact(idx(lp, lq)) = c * exp(-(lp*dr - mu) ** 2 / (2*(sigma ** 2 + 2*k*t*dt)))
             end do
         end do
     end subroutine update_exact
 
     subroutine update()
         implicit none
-        external dgesv
-        integer                         :: info
-        integer, dimension(N)           :: ipiv
-        real, dimension(:), allocatable :: next_u
-        
-        ! temporary holder
-        allocate(next_u(N))
-        
-        ! solve linear system M*next_u = u
-        call dgesv(N, 1, M, N, ipiv, u, N, info)
-        ! update values
-        u = next_u
-        
-        ! free memory
-        deallocate(next_u)
+        external sgesv
+        integer            :: info
+        real, dimension(N) :: ipiv
+
+        ! solve linear system M*next_u = u (result is directly stored in u)
+        call sgesv(N, 1, M, N, ipiv, u, N, info)
     end subroutine update
     
     real function diff_solutions()
@@ -208,24 +216,26 @@ contains
 
 end module heat_approximation
 
+!--------------------------------------------------------------------
+! TEST PROGRAM
+!--------------------------------------------------------------------
+
 program simulate
-    ! import linear algebra packages
-    !use la_precision, only: wp => sp
-    !use f95_lapack
     ! import heat_approximation module
     use heat_approximation
     
-    integer :: T = 10, lt
+    integer :: T = 20, lt
     real    :: d
     
     ! initialize variables
-    call initialize_variables(20, 30, 1.0, 1.0, 0.001)
+    call initialize_variables(5, 6, 1.0, 1.0, 0.001)
+    !call initialize_variables(20, 30, 1.0, 1.0, 0.001)
     
     do lt = 1, T
         call update()
         call update_exact(lt)
         d = diff_solutions()
-        print *, lt, d
+        print *, "t =", lt, "     diff =", d, "     u_exact(1) =", u_exact(1), "u(1) =", u(1)
     end do
     
     ! free memory
