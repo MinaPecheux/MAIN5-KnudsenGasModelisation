@@ -168,11 +168,11 @@ contains
         ! initialize scheme matrix M
         call initialize_matrix()
         
-        do i = 1,N
-            do j = 1,N
-                print *, "M[", i, ",", j, "] =", M(i,j)
-            end do
-        end do
+        !do i = 1,N
+        !    do j = 1,N
+        !        print *, "M[", i, ",", j, "] =", M(i,j)
+        !    end do
+        !end do
     end subroutine initialize_variables
     
     subroutine free_memory()
@@ -188,7 +188,7 @@ contains
         integer :: lq
         
         do lq = 1, Q
-            u(idx(P-1, lq)) = 1.0 - g()*dr    ! with arbitrary phantom point
+            u(idx(P, lq)) = 0.0    ! with arbitrary phantom point
         end do
     end subroutine border_func
     
@@ -220,10 +220,6 @@ contains
         ! apply border condition
         call border_func()
     end subroutine update
-    
-    real function diff_solutions()
-        diff_solutions = u_exact(1) - u(1)
-    end function diff_solutions
 
 end module heat_approximation
 
@@ -239,15 +235,19 @@ program simulate
     real    :: d
     
     ! initialize variables
-    call initialize_variables(5, 6, 1.0, 1.0, 0.001)
-    !call initialize_variables(20, 30, 1.0, 1.0, 0.001)
+    !call initialize_variables(5, 6, 1.0, 1.0, 0.001)
+    call initialize_variables(20, 30, 1.0, 1.0, 0.001)
     
+    open(1, file = 'output.dat')
     do lt = 1, T
         call update()
         call update_exact(lt)
-        d = diff_solutions()
-        print *, "t =", lt, "     diff =", d, "     u_exact(1) =", u_exact(1), "u(1) =", u(1)
+        do lp = 1, P
+            write(1,*) lp, u(idx(lp, 1)), u_exact(idx(lp, 1))
+        end do
+        print *, "t =", lt, "     diff =", u_exact(1)-u(1), "     u_exact(1) =", u_exact(1), "u(1) =", u(1)
     end do
+    close(1)
     
     ! free memory
     call free_memory()
