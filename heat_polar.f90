@@ -239,13 +239,15 @@ program simulate
     call initialize_variables(20, 30, 1.0, 1.0, 0.001)
     
     open(1, file = 'output.dat')
+    print *, "t = 0", "     u_exact(1) =", u_exact(1), "u(1) =", u(1)
     do lt = 1, T
         call update()
         call update_exact(lt)
-        do lp = 1, P
+        write(1,*) 0, u(1), u_exact(1)
+        do lp = 1, P-1
             write(1,*) lp, u(idx(lp, 1)), u_exact(idx(lp, 1))
         end do
-        print *, "t =", lt, "     diff =", u_exact(1)-u(1), "     u_exact(1) =", u_exact(1), "u(1) =", u(1)
+        print *, "t =", lt, "     diff =", u_exact(1)-u(1), "     u_ex(1) =", u_exact(1), "u(1) =", u(1)
     end do
     close(1)
     
