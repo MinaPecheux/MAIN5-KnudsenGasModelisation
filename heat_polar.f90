@@ -184,6 +184,14 @@ contains
     !--------------------------------------------------------------------
     ! SCHEME APPROXIMATION FUNCTIONS
     !--------------------------------------------------------------------
+    subroutine border_func()
+        integer :: lq
+        
+        do lq = 1, Q
+            u(idx(P-1, lq)) = 1.0 - g()*dr    ! with arbitrary phantom point
+        end do
+    end subroutine border_func
+    
     subroutine update_exact(t)
         implicit none
         integer, intent(in) :: t
@@ -208,6 +216,9 @@ contains
 
         ! solve linear system M*next_u = u (result is directly stored in u)
         call sgesv(N, 1, M, N, ipiv, u, N, info)
+        
+        ! apply border condition
+        call border_func()
     end subroutine update
     
     real function diff_solutions()
