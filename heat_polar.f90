@@ -6,11 +6,11 @@ module heat_approximation
 
 ! avoid automatic variables declarations
 implicit none
-    integer                           :: P, Q, N
-    real                              :: R, k, dr, dtheta, dt
-    real*8, parameter                 :: PI  = 4 * atan (1.0_8)
-    real, dimension(:), allocatable   :: u, u_exact
-    real, dimension(:,:), allocatable :: M
+    integer                             :: P, Q, N
+    real                                :: R, k, dr, dtheta, dt
+    real*8, parameter                   :: PI  = 4 * atan (1.0_8)
+    real*8, dimension(:), allocatable   :: u, u_exact
+    real*8, dimension(:,:), allocatable :: M
     
     ! (specific to Gaussian)
     real :: mu = 0.0, sigma = 0.1
@@ -37,7 +37,7 @@ contains
     subroutine initialize_arrays()
         implicit none
         integer :: lp, lq
-        real    :: c, tmp
+        real*8  :: c, tmp
         
         ! allocate arrays
         allocate(u(N))
@@ -55,22 +55,22 @@ contains
         end do
     end subroutine initialize_arrays
     
-    real function Ai(i)
+    real*8 function Ai(i)
         integer, intent(in) :: i
         Ai = 1.0 + 2*k*dt / (dr**2) + 2*k*dt/((i*dr)**2 * (dtheta**2))
     end function Ai
     
-    real function Bi(i)
+    real*8 function Bi(i)
         integer, intent(in) :: i
         Bi = -k*dt / ((i*dr)** 2 * (dtheta**2))
     end function Bi
     
-    real function Ci_p(i)
+    real*8 function Ci_p(i)
         integer, intent(in) :: i
         Ci_p = -k*dt/(dr**2) * (1.0 + 1/(2*i))
     end function Ci_p
     
-    real function Ci_m(i)
+    real*8 function Ci_m(i)
         integer, intent(in) :: i
         Ci_m = -k*dt/(dr**2) * (1.0 - 1/(2*i))
     end function Ci_m
@@ -163,7 +163,6 @@ contains
         call initialize_arrays()        
         ! initialize scheme matrix M
         call initialize_matrix()
-        print *, size(M)
     end subroutine initialize_variables
     
     subroutine free_memory()
@@ -187,7 +186,7 @@ contains
         implicit none
         integer, intent(in) :: t
         integer             :: lp, lq
-        real                :: c
+        real*8              :: c
         
         ! update values
         c = 1.0 / (sqrt(2*PI * (sigma ** 2 + 2*k*t*dt)))
@@ -201,10 +200,10 @@ contains
 
     subroutine update()
         implicit none
-        external sgesv
-        integer                           :: info, i, j
-        real, dimension(N)                :: ipiv
-        real, dimension(:,:), allocatable :: A
+        external dgesv
+        integer                             :: info, i, j
+        real*8, dimension(N)                :: ipiv
+        real*8, dimension(:,:), allocatable :: A
         
         ! prepare temporary matrix
         allocate(A(N,N))
@@ -215,7 +214,7 @@ contains
         end do
 
         ! solve linear system M*next_u = u (result is directly stored in u)
-        call sgesv(N, 1, A, N, ipiv, u, N, info)
+        call dgesv(N, 1, A, N, ipiv, u, N, info)
         
         ! apply border condition
         call border_func()
@@ -235,7 +234,6 @@ program simulate
     use heat_approximation
     
     integer :: T = 20, lt
-    real    :: d
     
     ! initialize variables
     !call initialize_variables(5, 6, 1.0, 1.0, 0.001)
