@@ -7,7 +7,7 @@ module heat_approximation
 ! avoid automatic variables declarations
 implicit none
     integer                             :: P, Q, N
-    real                                :: R, k, dr, dtheta, dt
+    real*8                              :: R, k, dr, dtheta, dt
     real*8, parameter                   :: PI  = 4 * atan (1.0_8)
     real*8, dimension(:), allocatable   :: u, u_exact
     real*8, dimension(:,:), allocatable :: M
@@ -147,15 +147,14 @@ contains
         
     end subroutine initialize_matrix
 
-    subroutine initialize_variables(lp, lq, lr, lk, ldt)
+    subroutine initialize_variables(lp, lq, lr, lk)
         implicit none
         integer, intent(in) :: lp, lq
-        real,    intent(in) :: lr, lk, ldt
+        real*8,  intent(in) :: lr, lk
 
         ! initialize variables
         P = lp; Q = lq; R = lr; k = lk
         dr = R / P; dtheta = 2*PI / Q
-        !dt = ldt
         dt = 0.5 / (k/(dr**2) + k/(dtheta**2))
         N = 1 + (P-1) * Q
         
@@ -201,12 +200,11 @@ contains
     subroutine update()
         implicit none
         external dgesv
-        integer                             :: info, i, j
-        real*8, dimension(N)                :: ipiv
-        real*8, dimension(:,:), allocatable :: A
+        integer                :: info, i, j
+        real*8, dimension(N)   :: ipiv
+        real*8, dimension(N,N) :: A
         
         ! prepare temporary matrix
-        allocate(A(N,N))
         do i = 1,N
             do j = 1,N
                 A(i,j) = M(i,j)
@@ -218,9 +216,6 @@ contains
         
         ! apply border condition
         call border_func()
-        
-        ! free memory
-        deallocate(A)
     end subroutine update
 
 end module heat_approximation
@@ -234,10 +229,10 @@ program simulate
     use heat_approximation
     
     integer :: T = 20, lt
+    real*8  :: lr = 1.0, lk = 1.0
     
     ! initialize variables
-    !call initialize_variables(5, 6, 1.0, 1.0, 0.001)
-    call initialize_variables(20, 30, 1.0, 1.0, 0.001)
+    call initialize_variables(20, 30, lr, lk)
     
     open(1, file = 'output.dat')
     print *, "t = 0", "     u_exact(1) =", u_exact(1), "u(1) =", u(1)
