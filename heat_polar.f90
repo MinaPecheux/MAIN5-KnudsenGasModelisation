@@ -8,7 +8,7 @@ module heat_approximation
 implicit none
     integer                           :: P, Q, N
     real                              :: R, k, dr, dtheta, dt
-    real(8), parameter                :: PI  = 4 * atan (1.0_8)
+    real*8, parameter                 :: PI  = 4 * atan (1.0_8)
     real, dimension(:), allocatable   :: u, u_exact
     real, dimension(:,:), allocatable :: M
     
@@ -77,9 +77,6 @@ contains
     
     subroutine initialize_matrix()
         integer :: lp, lq, tmp_q
-        
-        print *, "....",Ci_p(1)
-        print *, Ci_m(1)
         
         ! allocate matrix + initialize to zero
         allocate(M(N, N))
@@ -150,14 +147,13 @@ contains
         
     end subroutine initialize_matrix
 
-    subroutine initialize_variables(lP, lQ, lR, lk, ldt)
+    subroutine initialize_variables(lp, lq, lr, lk, ldt)
         implicit none
-        integer, intent(in) :: lP, lQ
-        real,    intent(in) :: lR, lk, ldt
-        integer :: i, j
+        integer, intent(in) :: lp, lq
+        real,    intent(in) :: lr, lk, ldt
 
         ! initialize variables
-        P = lP; Q = lQ; R = lR; k = lk
+        P = lp; Q = lq; R = lr; k = lk
         dr = R / P; dtheta = 2*PI / Q
         !dt = ldt
         dt = 0.5 / (k/(dr**2) + k/(dtheta**2))
@@ -167,12 +163,6 @@ contains
         call initialize_arrays()        
         ! initialize scheme matrix M
         call initialize_matrix()
-        
-        !do i = 1,N
-        !    do j = 1,N
-        !        print *, "M[", i, ",", j, "] =", M(i,j)
-        !    end do
-        !end do
     end subroutine initialize_variables
     
     subroutine free_memory()
@@ -188,7 +178,7 @@ contains
         integer :: lq
         
         do lq = 1, Q
-            u(idx(P, lq)) = 0.0    ! with arbitrary phantom point
+            u(idx(P-1, lq)) = 0.0    ! with Dirichlet condition
         end do
     end subroutine border_func
     
@@ -236,7 +226,7 @@ program simulate
     
     ! initialize variables
     !call initialize_variables(5, 6, 1.0, 1.0, 0.001)
-    call initialize_variables(20, 30, 1.0, 1.0, 0.001)
+    call initialize_variables(100, 10, 1.0, 1.0, 0.001)
     
     open(1, file = 'output.dat')
     print *, "t = 0", "     u_exact(1) =", u_exact(1), "u(1) =", u(1)
