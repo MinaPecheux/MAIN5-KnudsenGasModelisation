@@ -163,6 +163,7 @@ contains
         call initialize_arrays()        
         ! initialize scheme matrix M
         call initialize_matrix()
+        print *, size(M)
     end subroutine initialize_variables
     
     subroutine free_memory()
@@ -201,14 +202,26 @@ contains
     subroutine update()
         implicit none
         external sgesv
-        integer            :: info
-        real, dimension(N) :: ipiv
+        integer                           :: info, i, j
+        real, dimension(N)                :: ipiv
+        real, dimension(:,:), allocatable :: A
+        
+        ! prepare temporary matrix
+        allocate(A(N,N))
+        do i = 1,N
+            do j = 1,N
+                A(i,j) = M(i,j)
+            end do
+        end do
 
         ! solve linear system M*next_u = u (result is directly stored in u)
-        call sgesv(N, 1, M, N, ipiv, u, N, info)
+        call sgesv(N, 1, A, N, ipiv, u, N, info)
         
         ! apply border condition
         call border_func()
+        
+        ! free memory
+        deallocate(A)
     end subroutine update
 
 end module heat_approximation
@@ -226,7 +239,7 @@ program simulate
     
     ! initialize variables
     !call initialize_variables(5, 6, 1.0, 1.0, 0.001)
-    call initialize_variables(100, 10, 1.0, 1.0, 0.001)
+    call initialize_variables(20, 30, 1.0, 1.0, 0.001)
     
     open(1, file = 'output.dat')
     print *, "t = 0", "     u_exact(1) =", u_exact(1), "u(1) =", u(1)
