@@ -13,7 +13,7 @@ implicit none
     real*8, dimension(:,:), allocatable :: M
     
     ! (specific to Gaussian)
-    real :: mu = 0.0, sigma = 0.1
+    real*8 :: mu = 0.0, sigma = 0.1
 
 contains
 
@@ -92,76 +92,72 @@ contains
         M(1,Q/2+2) = -2.0*k*dt/(dr**2)
         
         ! specific treatment for first ring (p = 1)
-        do lq = 1, Q
-            M(lq+1,1)    = Ci_m(1)
-            M(lq+1,lq+1) = Ai(1)
-            if (lq == 1) then
-                M(lq+1, Q+1)  = Bi(1)
+        do tmp_q = 1, Q
+            lq = 1 + tmp_q
+            M(lq,1)  = Ci_m(1)
+            M(lq,lq) = Ai(1)
+            if (lq == 2) then
+                M(lq, Q+1)  = Bi(1)
             else
-                M(lq+1, lq)   = Bi(1)
+                M(lq, lq-1) = Bi(1)
             end if
-            if (lq == Q) then
-                M(lq+1, 1)    = Bi(1)
+            if (lq == Q+1) then
+                M(lq, 2)    = Bi(1)
             else
-                M(lq+1, lq+2) = Bi(1)
+                M(lq, lq+1) = Bi(1)
             end if
-            M(lq+1, lq+Q+1) = Ci_p(1)
+            M(lq, lq+Q) = Ci_p(1)
         end do
         
-        ! middle points
-        do lp = 2, P-2
+        ! other points (mid points + last ring)
+        do lp = 2, P-1
             do tmp_q = 1, Q
-                lq           = tmp_q + (lp-1) * Q
-                M(lq+1,lq+1-Q) = Ci_m(lp)
-                M(lq+1,lq+1)   = Ai(lp)
+                lq         = 1 + tmp_q + (lp-1) * Q
+                M(lq,lq-Q) = Ci_m(lp)
+                M(lq,lq)   = Ai(lp)
                 if (tmp_q == 1) then
-                    M(lq+1, lq+Q)       = Bi(lp)
+                    M(lq,lq+Q-1)     = Bi(lp)
                 else
-                    M(lq+1, lq)         = Bi(lp)
+                    M(lq,lq-1)       = Bi(lp)
                 end if
                 if (tmp_q == Q) then
-                    M(lq+1, 2+(lp-1)*Q) = Bi(lp)
+                    M(lq,2+(lp-1)*Q) = Bi(lp)
                 else
-                    M(lq+1, lq+2)       = Bi(lp)
+                    M(lq,lq+1)       = Bi(lp)
+                end if
+                
+                if (lp < P-1) then
+                    M(lq,lq+Q) = Ci_p(lp)
                 end if
             end do
-            M(lq+1, lq+Q+1) = Ci_p(lp)
-        end do
-            
-        ! specific treatment for last ring (p = P-1)
-        do tmp_q = 1, Q
-            lq             = tmp_q + (P-2) * Q
-            M(lq+1,lq+1-Q) = Ci_m(P-1)
-            M(lq+1,lq+1)   = Ai(P-1)
-            if (tmp_q == 1) then
-                M(lq+1, lq+Q)      = Bi(P-1)
-            else
-                M(lq+1, lq)        = Bi(P-1)
-            end if
-            if (tmp_q == Q) then
-                M(lq+1, 2+(P-2)*Q) = Bi(P-1)
-            else
-                M(lq+1, lq+2)      = Bi(P-1)
-            end if
         end do
         
     end subroutine initialize_matrix
 
-    subroutine initialize_variables(lp, lq, lr, lk)
+    subroutine initialize_variables(lp, lq, lr, lk, ldt)
         implicit none
         integer, intent(in) :: lp, lq
-        real*8,  intent(in) :: lr, lk
+        real*8,  intent(in) :: lr, lk, ldt
+        integer :: i,j
 
         ! initialize variables
         P = lp; Q = lq; R = lr; k = lk
         dr = R / P; dtheta = 2*PI / Q
-        dt = 0.5 / (k/(dr**2) + k/(dtheta**2))
+        dt = ldt
         N = 1 + (P-1) * Q
         
         ! initialize arrays
         call initialize_arrays()        
         ! initialize scheme matrix M
         call initialize_matrix()
+        
+        if (P == 5) then
+            do i = 1,N
+                do j = 1,N
+                    print *, "M[", i, ", ", j, "] =", M(i,j)
+                end do
+            end do
+        end if
     end subroutine initialize_variables
     
     subroutine free_memory()
@@ -183,16 +179,16 @@ contains
     
     subroutine update_exact(t)
         implicit none
-        integer, intent(in) :: t
-        integer             :: lp, lq
-        real*8              :: c
+        real*8, intent(in) :: t
+        integer            :: lp, lq
+        real*8             :: c
         
         ! update values
-        c = 1.0 / (sqrt(2*PI * (sigma ** 2 + 2*k*t*dt)))
+        c = 1.0 / (sqrt(2*PI * (sigma ** 2 + 2*k*t)))
         u_exact(1) = c
         do lp = 1, P-1
             do lq = 1, Q
-                u_exact(idx(lp, lq)) = c * exp(-(lp*dr - mu) ** 2 / (2*(sigma ** 2 + 2*k*t*dt)))
+                u_exact(idx(lp, lq)) = c * exp(-(lp*dr - mu) ** 2 / (2*(sigma ** 2 + 2*k*t)))
             end do
         end do
     end subroutine update_exact
@@ -228,17 +224,17 @@ program simulate
     ! import heat_approximation module
     use heat_approximation
     
-    integer :: T = 20, lt
-    real*8  :: lr = 1.0, lk = 1.0
+    integer :: lt
+    real*8  :: lr = 1.0, lk = 1.0, ldt = 0.001, T = 0.02
     
     ! initialize variables
-    call initialize_variables(20, 30, lr, lk)
+    call initialize_variables(40, 30, lr, lk, ldt)
     
     open(1, file = 'output.dat')
     print *, "t = 0", "     u_exact(1) =", u_exact(1), "u(1) =", u(1)
-    do lt = 1, T
+    do lt = 1, int(T/ldt)
         call update()
-        call update_exact(lt)
+        call update_exact(lt*ldt)
         write(1,*) 0, u(1), u_exact(1)
         do lp = 1, P-1
             write(1,*) lp, u(idx(lp, 1)), u_exact(idx(lp, 1))
