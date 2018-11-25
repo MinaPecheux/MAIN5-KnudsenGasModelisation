@@ -7,7 +7,7 @@ module heat_approximation
 ! avoid automatic variables declarations
 implicit none
     integer                             :: P, Q, N
-    real*8                              :: R, k, dr, dtheta, dt
+    real*8                              :: R, k, dr, dtheta, dt, TP = 1.0
     real*8, parameter                   :: PI  = 4 * atan (1.0_8)
     real*8, dimension(:), allocatable   :: u, u_exact
     real*8, dimension(:,:), allocatable :: M
@@ -138,7 +138,6 @@ contains
         implicit none
         integer, intent(in) :: lp, lq
         real*8,  intent(in) :: lr, lk, ldt
-        integer :: i,j
 
         ! initialize variables
         P = lp; Q = lq; R = lr; k = lk
@@ -150,14 +149,6 @@ contains
         call initialize_arrays()        
         ! initialize scheme matrix M
         call initialize_matrix()
-        
-        if (P == 5) then
-            do i = 1,N
-                do j = 1,N
-                    print *, "M[", i, ", ", j, "] =", M(i,j)
-                end do
-            end do
-        end if
     end subroutine initialize_variables
     
     subroutine free_memory()
@@ -171,9 +162,9 @@ contains
     !--------------------------------------------------------------------
     subroutine border_func()
         integer :: lq
-        
         do lq = 1, Q
-            u(idx(P-1, lq)) = 0.0    ! with Dirichlet condition
+            !u(idx(P-1, lq)) = 0.0            ! with Dirichlet condition
+            u(idx(P-1, lq)) = TP - g()*dr    ! with Neumann condition
         end do
     end subroutine border_func
     
